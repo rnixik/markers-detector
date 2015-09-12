@@ -1,7 +1,11 @@
-#ifdef MARKERSDETECTOR_EXPORTS
+#ifdef MARKERSDETECTORDLL_EXPORTS
 #define MARKERSDETECTOR_API __declspec(dllexport) 
 #else
-#define MARKERSDETECTOR_API __declspec(dllimport) 
+  #ifndef __ANDROID__
+    #define MARKERSDETECTOR_API __declspec(dllimport)
+  #else
+    #define MARKERSDETECTOR_API 
+  #endif
 #endif
 
 #pragma once
@@ -30,7 +34,7 @@ private:
 
 };
 
-class MarkersDetector{
+class MARKERSDETECTOR_API MarkersDetector{
 
 public:
 	MarkersDetector(map <int, std::array<float, 3>>* markersLocations, std::array<double, 9> cameraMatrixBuf, std::array<double, 8> cameraDistortionBuf, int markerHalfSize);

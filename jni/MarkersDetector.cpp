@@ -492,7 +492,10 @@ bool MarkersDetector::captureCamera(int cameraId, int width, int height)
 }
 void MarkersDetector::releaseCamera()
 {
-	stream->release();
+    if (stream && m_isOpen) {
+        stream->release();
+    }
+	
 	m_isOpen = false;
 }
 

@@ -7,7 +7,7 @@ include S:\Programs\NVPACK\OpenCV-2.4.8.2-Tegra-sdk\sdk\native\jni\OpenCV.mk
 
 LOCAL_MODULE    := markersdetector
 LOCAL_CFLAGS    := -std=gnu++11
-LOCAL_SRC_FILES := MarkersDetector.cpp 
-LOCAL_C_INCLUDES += $(LOCAL_PATH)
+LOCAL_SRC_FILES := ../source/MarkersDetector.cpp 
+LOCAL_C_INCLUDES += $(LOCAL_PATH)/../source
 LOCAL_LDLIBS    += -llog -ldl -lGLESv2
 include $(BUILD_SHARED_LIBRARY)

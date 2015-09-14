@@ -1,4 +1,4 @@
-#ifdef MARKERSDETECTORDLL_EXPORTS
+#ifdef MARKERSDETECTOR_EXPORTS
 #define MARKERSDETECTOR_API __declspec(dllexport) 
 #else
   #ifndef __ANDROID__
@@ -42,6 +42,7 @@ public:
 	int threshold = 0;
 
 	bool captureCamera(int cameraId, int width, int height);
+	bool captureCameraAuto(int cameraId);
 	void releaseCamera();
 
 	std::vector<Marker> detectMarkers(Mat frame);
@@ -52,6 +53,8 @@ public:
 	void getCameraPoseByImage(Mat& frame, cv::Point3f& camLocation, cv::Point3f& camRotation, int& usedMarkers);
 
 	void update(std::vector<uchar>& buffer, std::array<float, 3>& camLocation, std::array<float, 3>& camRotation, int& usedMarkers);
+
+	void updateCameraPose(std::array<float, 3>& camLocation, std::array<float, 3>& camRotation, int& usedMarkers);
 
 private:
 

@@ -180,7 +180,7 @@ std::vector<Marker> MarkersDetector::filterMarkersByPerimiter(std::vector<Marker
 
 	// Remove these elements which corners are too close to eachother.
 	// First detect candidates for removal:
-	std::vector< std::pair<int, int> > tooNearCandidates;
+	std::vector< std::pair<size_t, size_t> > tooNearCandidates;
 	for (size_t i = 0; i<possibleMarkers.size(); i++)
 	{
 		const Marker& m1 = possibleMarkers[i];
@@ -189,7 +189,7 @@ std::vector<Marker> MarkersDetector::filterMarkersByPerimiter(std::vector<Marker
 		{
 			const Marker& m2 = possibleMarkers[j];
 			float distSquared = 0;
-			for (int c = 0; c < 4; c++)
+			for (size_t c = 0; c < 4; c++)
 			{
 				cv::Point v = m1.points[c] - m2.points[c];
 				distSquared += v.dot(v);
@@ -490,12 +490,23 @@ bool MarkersDetector::captureCamera(int cameraId, int width, int height)
 	m_isOpen = stream->isOpened();
 	return m_isOpen;
 }
+
+bool MarkersDetector::captureCameraAuto(int cameraId)
+{
+	stream = new cv::VideoCapture();
+	stream->open(cameraId);
+
+	m_isOpen = stream->isOpened();
+	return m_isOpen;
+}
+
 void MarkersDetector::releaseCamera()
 {
-    if (stream && m_isOpen) {
-        stream->release();
-    }
-	
+	if (!m_isOpen) {
+		return;
+	}
+
+    stream->release();
 	m_isOpen = false;
 }
 
@@ -514,6 +525,29 @@ void MarkersDetector::update(std::vector<uchar>& buffer, std::array<float, 3>& c
 	getCameraPoseByImage(frame, cl, cr, usedMarkers);
 
 	(buffer).assign(frame.datastart, frame.dataend);
+
+	camLocation[0] = cl.x;
+	camLocation[1] = cl.y;
+	camLocation[2] = cl.z;
+
+	camRotation[0] = cr.x;
+	camRotation[1] = cr.y;
+	camRotation[2] = cr.z;
+}
+
+void MarkersDetector::updateCameraPose(std::array<float, 3>& camLocation, std::array<float, 3>& camRotation, int& usedMarkers)
+{
+	if (!m_isOpen) {
+		return;
+	}
+
+	Mat frame;
+	stream->read(frame);
+
+	cv::Point3f cl;
+	cv::Point3f cr;
+
+	getCameraPoseByImage(frame, cl, cr, usedMarkers);
 
 	camLocation[0] = cl.x;
 	camLocation[1] = cl.y;

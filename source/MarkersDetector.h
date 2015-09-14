@@ -64,7 +64,7 @@ private:
 	int m_minContourLengthAllowed = 1000;
 
 	VideoCapture* stream;
-	bool m_isOpen;
+	bool m_isOpen = false;
 
 	Size m_markerSize;
 	std::vector<Point2f> m_markerCorners2d;

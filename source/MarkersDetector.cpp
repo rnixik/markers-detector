@@ -69,6 +69,8 @@ MarkersDetector::MarkersDetector(std::map <int, std::array<float, 3>>* markersLo
 	m_markerCorners3d.push_back(Point3f(-halfSize, -halfSize, 0));
 	m_markerCorners3d.push_back(Point3f(halfSize, -halfSize, 0));
 	m_markerCorners3d.push_back(Point3f(halfSize, halfSize, 0));
+
+	m_isOpen = false;
 }
 
 std::vector<Marker> MarkersDetector::detectMarkers(Mat frame)
@@ -493,6 +495,10 @@ bool MarkersDetector::captureCamera(int cameraId, int width, int height)
 
 bool MarkersDetector::captureCameraAuto(int cameraId)
 {
+	if (m_isOpen) {
+		return m_isOpen;
+	}
+
 	stream = new cv::VideoCapture();
 	stream->open(cameraId);
 
@@ -502,11 +508,10 @@ bool MarkersDetector::captureCameraAuto(int cameraId)
 
 void MarkersDetector::releaseCamera()
 {
-	if (!m_isOpen) {
-		return;
+	if (stream && stream->isOpened()) {
+		stream->release();
 	}
-
-    stream->release();
+    
 	m_isOpen = false;
 }
 

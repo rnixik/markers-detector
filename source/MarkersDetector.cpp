@@ -12,6 +12,7 @@
 using namespace cv;
 using namespace std;
 
+
 float Marker::getPerimeter()
 {
 	float p = arcLength(points, true);
@@ -502,6 +503,7 @@ bool MarkersDetector::captureCameraAuto(int cameraId)
 	stream = new cv::VideoCapture();
 	stream->open(cameraId);
 
+
 	m_isOpen = stream->isOpened();
 	return m_isOpen;
 }
@@ -510,6 +512,7 @@ void MarkersDetector::releaseCamera()
 {
 	if (stream && stream->isOpened()) {
 		stream->release();
+		delete stream;
 	}
     
 	m_isOpen = false;
@@ -542,17 +545,23 @@ void MarkersDetector::update(std::vector<uchar>& buffer, std::array<float, 3>& c
 
 void MarkersDetector::updateCameraPose(std::array<float, 3>& camLocation, std::array<float, 3>& camRotation, int& usedMarkers)
 {
-	if (!m_isOpen) {
+	if (!m_isOpen && !MarkersDetector::frame.data) {
 		return;
 	}
 
-	Mat frame;
-	stream->read(frame);
+    
+	Mat f;
+	
+	if (m_isOpen) {
+		stream->read(f);
+	} else {
+	    f = MarkersDetector::frame;
+	}
 
 	cv::Point3f cl;
 	cv::Point3f cr;
 
-	getCameraPoseByImage(frame, cl, cr, usedMarkers);
+	getCameraPoseByImage(f, cl, cr, usedMarkers);
 
 	camLocation[0] = cl.x;
 	camLocation[1] = cl.y;
@@ -562,3 +571,36 @@ void MarkersDetector::updateCameraPose(std::array<float, 3>& camLocation, std::a
 	camRotation[1] = cr.y;
 	camRotation[2] = cr.z;
 }
+
+
+#ifdef __ANDROID__
+
+cv::Mat MarkersDetector::frame;
+
+extern "C"
+jboolean
+Java_org_getid_markersdetector_AndroidCamera_FrameProcessing(
+        JNIEnv* env, jobject thiz,
+        jint width, jint height,
+        jbyteArray NV21FrameData, jintArray outPixels)
+{
+    jbyte * pNV21FrameData = env->GetByteArrayElements(NV21FrameData, 0);
+    jint * poutPixels = env->GetIntArrayElements(outPixels, 0);
+
+
+    Mat mInput(height, width, CV_8UC4, (unsigned char *)pNV21FrameData);
+    Mat mResult(height, width, CV_8UC4, (unsigned char *)poutPixels);
+
+    mResult = mInput;
+    MarkersDetector::frame = mInput;
+
+    //LOGI("Camera frame img proc: %dx%d", frame.cols, frame.rows);
+
+    env->ReleaseByteArrayElements(NV21FrameData, pNV21FrameData, 0);
+    env->ReleaseIntArrayElements(outPixels, poutPixels, 0);
+    return true;
+}
+#endif
+
+
+

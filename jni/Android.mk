@@ -1,6 +1,6 @@
 LOCAL_PATH := $(call my-dir)
 
-OPENCV_CAMERA_MODULES:=on
+OPENCV_CAMERA_MODULES:=off
 OPENCV_INSTALL_MODULES:=on
 OPENCV_LIB_TYPE:=STATIC
 include S:\Programs\NVPACK\OpenCV-2.4.8.2-Tegra-sdk\sdk\native\jni\OpenCV.mk

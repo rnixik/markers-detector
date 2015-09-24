@@ -16,6 +16,11 @@
 #include <array>
 #include <map>
 
+#ifdef __ANDROID__
+    #include <jni.h>
+    #include <errno.h>
+#endif
+
 using namespace cv;
 using namespace std;
 
@@ -55,6 +60,8 @@ public:
 	void update(std::vector<uchar>& buffer, std::array<float, 3>& camLocation, std::array<float, 3>& camRotation, int& usedMarkers);
 
 	void updateCameraPose(std::array<float, 3>& camLocation, std::array<float, 3>& camRotation, int& usedMarkers);
+	
+	static cv::Mat frame;
 
 private:
 
@@ -90,3 +97,13 @@ private:
 	void detectMarkersLocation(Mat imgGrey, std::vector<Marker>& markers);
 
 };
+
+
+#ifdef __ANDROID__
+extern "C"
+jboolean
+Java_org_getid_markersdetector_AndroidCamera_FrameProcessing(
+        JNIEnv* env, jobject thiz,
+        jint width, jint height,
+        jbyteArray NV21FrameData, jintArray outPixels);
+#endif        

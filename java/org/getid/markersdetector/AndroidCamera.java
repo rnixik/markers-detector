@@ -10,6 +10,8 @@ import android.os.Looper;
 import android.util.Log;
 
 import java.io.IOException;
+import java.util.Timer;
+import java.util.TimerTask;
 
 public class AndroidCamera implements Camera.PreviewCallback{
     private static final String TAG = "AndroidCamera";
@@ -17,7 +19,10 @@ public class AndroidCamera implements Camera.PreviewCallback{
     private Camera mCamera;
     private int imageFormat;
 
-    private int[] pixels = null;
+    private byte[] buffer = null;
+    private int bufferSize = 0;
+    private boolean bufferUsed = true;
+
     private byte[] FrameData = null;
     private int PreviewSizeWidth = 640;
     private int PreviewSizeHeight = 480;
@@ -34,15 +39,23 @@ public class AndroidCamera implements Camera.PreviewCallback{
             // Camera is not available (in use or does not exist)
         }
         return c; // returns null if camera is unavailable
+
     }
 
 
-        public AndroidCamera(Context context) {
-            //super(context);
-            pixels = new int[PreviewSizeWidth * PreviewSizeHeight];
+    public AndroidCamera(Context context) {
+        //super(context);
 
-            //startPreview();
-        }
+        new Timer().scheduleAtFixedRate(new TimerTask(){
+            @Override
+            public void run(){
+                if (mCamera != null && bufferUsed && IsReadyToGetFrame()) {
+                    addBuffer();
+                }
+            }
+        },0,30);
+
+    }
 
     public void startPreview() {
         Log.d(TAG, "Try to start preview");
@@ -64,6 +77,9 @@ public class AndroidCamera implements Camera.PreviewCallback{
         imageFormat = parameters.getPreviewFormat();
         mCamera.setParameters(parameters);
 
+        Camera.Size size = parameters.getPreviewSize();
+        bufferSize = size.width * size.height * ImageFormat.getBitsPerPixel(imageFormat) / 8;
+
         /* Workaround for API > 10. It needs some preview destination */
         if (Build.VERSION.SDK_INT > 10) {
             SurfaceTexture surfaceTexture = new SurfaceTexture(10);
@@ -74,7 +90,8 @@ public class AndroidCamera implements Camera.PreviewCallback{
             }
         }
 
-        mCamera.setPreviewCallback(this);
+        //mCamera.setPreviewCallback(this);
+        mCamera.setPreviewCallbackWithBuffer(this);
         mCamera.startPreview();
     }
 
@@ -85,16 +102,26 @@ public class AndroidCamera implements Camera.PreviewCallback{
             return;
         }
         mCamera.setPreviewCallback(null);
+        mCamera.setPreviewCallbackWithBuffer(null);
         mCamera.stopPreview();
         mCamera.release();
         mCamera = null;
+    }
+
+    private void addBuffer() {
+        buffer = new byte[bufferSize];
+        mCamera.addCallbackBuffer(buffer);
+        bufferUsed = false;
     }
 
 
         @Override
         public void onPreviewFrame(byte[] arg0, Camera arg1)
         {
-            Log.d(TAG, "Got frame");
+
+            //Log.d(TAG, "Got frame");
+            bufferUsed = true;
+
             // At preview mode, the frame data will push to here.
             if (imageFormat == ImageFormat.NV21)
             {
@@ -115,13 +142,14 @@ public class AndroidCamera implements Camera.PreviewCallback{
             public void run()
             {
                 bProcessing = true;
-                FrameProcessing(PreviewSizeWidth, PreviewSizeHeight, FrameData, pixels);
+                FrameProcessing(PreviewSizeWidth, PreviewSizeHeight, FrameData);
                 bProcessing = false;
             }
         };
 
 
-    public native boolean FrameProcessing(int width, int height,
-                                          byte[] NV21FrameData, int [] pixels);
+    public native boolean FrameProcessing(int width, int height, byte[] NV21FrameData);
+
+    public native boolean IsReadyToGetFrame();
 
 }

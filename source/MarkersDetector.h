@@ -61,7 +61,8 @@ public:
 
 	void updateCameraPose(std::array<float, 3>& camLocation, std::array<float, 3>& camRotation, int& usedMarkers);
 	
-	static cv::Mat frame;
+	static cv::Mat androidFrame;
+	static bool androidReady;
 
 private:
 
@@ -96,6 +97,8 @@ private:
 
 	void detectMarkersLocation(Mat imgGrey, std::vector<Marker>& markers);
 
+	Mat getFrame();
+
 };
 
 
@@ -105,5 +108,9 @@ jboolean
 Java_org_getid_markersdetector_AndroidCamera_FrameProcessing(
         JNIEnv* env, jobject thiz,
         jint width, jint height,
-        jbyteArray NV21FrameData, jintArray outPixels);
+        jbyteArray NV21FrameData);
+
+extern "C"
+jboolean
+Java_org_getid_markersdetector_AndroidCamera_IsReadyToGetFrame(JNIEnv* env, jobject thiz);
 #endif        

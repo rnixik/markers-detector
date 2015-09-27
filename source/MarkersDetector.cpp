@@ -13,6 +13,10 @@ using namespace cv;
 using namespace std;
 
 
+cv::Mat MarkersDetector::androidFrame;
+bool MarkersDetector::androidReady;
+
+
 float Marker::getPerimeter()
 {
 	float p = arcLength(points, true);
@@ -72,6 +76,8 @@ MarkersDetector::MarkersDetector(std::map <int, std::array<float, 3>>* markersLo
 	m_markerCorners3d.push_back(Point3f(halfSize, halfSize, 0));
 
 	m_isOpen = false;
+
+	MarkersDetector::androidReady = true;
 }
 
 std::vector<Marker> MarkersDetector::detectMarkers(Mat frame)
@@ -485,6 +491,10 @@ void MarkersDetector::getCameraPoseByImage(Mat& frame, cv::Point3f& camLocation,
 
 bool MarkersDetector::captureCamera(int cameraId, int width, int height)
 {
+	#ifdef __ANDROID__
+		return true;
+	#endif
+
 	stream = new cv::VideoCapture();
 	stream->open(cameraId);
 	stream->set(CV_CAP_PROP_FRAME_WIDTH, width);
@@ -496,6 +506,10 @@ bool MarkersDetector::captureCamera(int cameraId, int width, int height)
 
 bool MarkersDetector::captureCameraAuto(int cameraId)
 {
+	#ifdef __ANDROID__
+		return true;
+	#endif
+
 	if (m_isOpen) {
 		return m_isOpen;
 	}
@@ -518,14 +532,34 @@ void MarkersDetector::releaseCamera()
 	m_isOpen = false;
 }
 
-void MarkersDetector::update(std::vector<uchar>& buffer, std::array<float, 3>& camLocation, std::array<float, 3>& camRotation, int& usedMarkers)
+Mat MarkersDetector::getFrame()
 {
-	if (!m_isOpen) {
-		return;
+
+	Mat f;
+
+
+	if (!m_isOpen && !MarkersDetector::androidFrame.data) {
+		return f;
 	}
 
-	Mat frame;
-	stream->read(frame);
+
+	if (m_isOpen) {
+		stream->read(f);
+	}
+	else {
+		f = MarkersDetector::androidFrame;
+	}
+
+	return f;
+}
+
+void MarkersDetector::update(std::vector<uchar>& buffer, std::array<float, 3>& camLocation, std::array<float, 3>& camRotation, int& usedMarkers)
+{
+
+	Mat frame = getFrame();
+	if (!frame.data) {
+		return;
+	}
 
 	cv::Point3f cl;
 	cv::Point3f cr;
@@ -541,27 +575,21 @@ void MarkersDetector::update(std::vector<uchar>& buffer, std::array<float, 3>& c
 	camRotation[0] = cr.x;
 	camRotation[1] = cr.y;
 	camRotation[2] = cr.z;
+
+	MarkersDetector::androidReady = true;
 }
 
 void MarkersDetector::updateCameraPose(std::array<float, 3>& camLocation, std::array<float, 3>& camRotation, int& usedMarkers)
 {
-	if (!m_isOpen && !MarkersDetector::frame.data) {
+	Mat frame = getFrame();
+	if (!frame.data) {
 		return;
-	}
-
-    
-	Mat f;
-	
-	if (m_isOpen) {
-		stream->read(f);
-	} else {
-	    f = MarkersDetector::frame;
 	}
 
 	cv::Point3f cl;
 	cv::Point3f cr;
 
-	getCameraPoseByImage(f, cl, cr, usedMarkers);
+	getCameraPoseByImage(frame, cl, cr, usedMarkers);
 
 	camLocation[0] = cl.x;
 	camLocation[1] = cl.y;
@@ -570,36 +598,38 @@ void MarkersDetector::updateCameraPose(std::array<float, 3>& camLocation, std::a
 	camRotation[0] = cr.x;
 	camRotation[1] = cr.y;
 	camRotation[2] = cr.z;
+
+	MarkersDetector::androidReady = true;
 }
 
 
 #ifdef __ANDROID__
 
-cv::Mat MarkersDetector::frame;
-
 extern "C"
 jboolean
 Java_org_getid_markersdetector_AndroidCamera_FrameProcessing(
-        JNIEnv* env, jobject thiz,
-        jint width, jint height,
-        jbyteArray NV21FrameData, jintArray outPixels)
+JNIEnv* env, jobject thiz,
+jint width, jint height,
+jbyteArray NV21FrameData)
 {
-    jbyte * pNV21FrameData = env->GetByteArrayElements(NV21FrameData, 0);
-    jint * poutPixels = env->GetIntArrayElements(outPixels, 0);
+	jbyte * pNV21FrameData = env->GetByteArrayElements(NV21FrameData, 0);
 
 
-    Mat mInput(height, width, CV_8UC4, (unsigned char *)pNV21FrameData);
-    Mat mResult(height, width, CV_8UC4, (unsigned char *)poutPixels);
+	MarkersDetector::androidFrame = Mat(height, width, CV_8UC4, (unsigned char *)pNV21FrameData);
+	MarkersDetector::androidReady = false;
 
-    mResult = mInput;
-    MarkersDetector::frame = mInput;
-
-    //LOGI("Camera frame img proc: %dx%d", frame.cols, frame.rows);
-
-    env->ReleaseByteArrayElements(NV21FrameData, pNV21FrameData, 0);
-    env->ReleaseIntArrayElements(outPixels, poutPixels, 0);
-    return true;
+	env->ReleaseByteArrayElements(NV21FrameData, pNV21FrameData, 0);
+	return true;
 }
+
+
+extern "C"
+jboolean
+Java_org_getid_markersdetector_AndroidCamera_IsReadyToGetFrame(JNIEnv* env, jobject thiz)
+{
+	return MarkersDetector::androidReady;
+}
+
 #endif
 
 

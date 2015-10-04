@@ -12,6 +12,10 @@
 
 #include "opencv2/core/core.hpp"
 #include "opencv2/highgui/highgui.hpp"
+
+//#include "opencv2/core.hpp"
+//#include "opencv2/highgui.hpp"
+
 #include <vector>
 #include <array>
 #include <map>
@@ -19,6 +23,10 @@
 #ifdef __ANDROID__
     #include <jni.h>
     #include <errno.h>
+    #include <android/log.h>
+
+    #define ALOGI(...) ((void)__android_log_print(ANDROID_LOG_INFO, "MarkersDetector", __VA_ARGS__))
+    #define ALOGW(...) ((void)__android_log_print(ANDROID_LOG_WARN, "MarkersDetector", __VA_ARGS__))
 #endif
 
 using namespace cv;
@@ -38,6 +46,9 @@ private:
 
 
 };
+
+typedef void(*AfterFrameUpdateCallback)();
+typedef void(*AfterPoseUpdateCallback)(std::array<float, 3> camLocation, std::array<float, 3> camRotation, int usedMarkers);
 
 class MARKERSDETECTOR_API MarkersDetector{
 
@@ -62,7 +73,11 @@ public:
 	void updateCameraPose(std::array<float, 3>& camLocation, std::array<float, 3>& camRotation, int& usedMarkers);
 	
 	static cv::Mat androidFrame;
-	static bool androidReady;
+
+	static AfterFrameUpdateCallback afterFrameUpdateCallback;
+
+	void updateCameraPoseWithCallback();
+	AfterPoseUpdateCallback afterPoseUpdateCallback;
 
 private:
 

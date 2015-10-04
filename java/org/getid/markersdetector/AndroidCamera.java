@@ -19,10 +19,6 @@ public class AndroidCamera implements Camera.PreviewCallback{
     private Camera mCamera;
     private int imageFormat;
 
-    private byte[] buffer = null;
-    private int bufferSize = 0;
-    private boolean bufferUsed = true;
-
     private byte[] FrameData = null;
     private int PreviewSizeWidth = 640;
     private int PreviewSizeHeight = 480;
@@ -45,16 +41,6 @@ public class AndroidCamera implements Camera.PreviewCallback{
 
     public AndroidCamera(Context context) {
         //super(context);
-
-        new Timer().scheduleAtFixedRate(new TimerTask(){
-            @Override
-            public void run(){
-                if (mCamera != null && bufferUsed && IsReadyToGetFrame()) {
-                    addBuffer();
-                }
-            }
-        },0,30);
-
     }
 
     public void startPreview() {
@@ -78,7 +64,7 @@ public class AndroidCamera implements Camera.PreviewCallback{
         mCamera.setParameters(parameters);
 
         Camera.Size size = parameters.getPreviewSize();
-        bufferSize = size.width * size.height * ImageFormat.getBitsPerPixel(imageFormat) / 8;
+        //bufferSize = size.width * size.height * ImageFormat.getBitsPerPixel(imageFormat) / 8;
 
         /* Workaround for API > 10. It needs some preview destination */
         if (Build.VERSION.SDK_INT > 10) {
@@ -90,8 +76,7 @@ public class AndroidCamera implements Camera.PreviewCallback{
             }
         }
 
-        //mCamera.setPreviewCallback(this);
-        mCamera.setPreviewCallbackWithBuffer(this);
+        mCamera.setPreviewCallback(this);
         mCamera.startPreview();
     }
 
@@ -102,25 +87,16 @@ public class AndroidCamera implements Camera.PreviewCallback{
             return;
         }
         mCamera.setPreviewCallback(null);
-        mCamera.setPreviewCallbackWithBuffer(null);
         mCamera.stopPreview();
         mCamera.release();
         mCamera = null;
-    }
-
-    private void addBuffer() {
-        buffer = new byte[bufferSize];
-        mCamera.addCallbackBuffer(buffer);
-        bufferUsed = false;
     }
 
 
         @Override
         public void onPreviewFrame(byte[] arg0, Camera arg1)
         {
-
             //Log.d(TAG, "Got frame");
-            bufferUsed = true;
 
             // At preview mode, the frame data will push to here.
             if (imageFormat == ImageFormat.NV21)
@@ -149,7 +125,5 @@ public class AndroidCamera implements Camera.PreviewCallback{
 
 
     public native boolean FrameProcessing(int width, int height, byte[] NV21FrameData);
-
-    public native boolean IsReadyToGetFrame();
 
 }

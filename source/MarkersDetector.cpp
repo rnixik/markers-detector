@@ -1,7 +1,8 @@
-#include "opencv2/core/core.hpp"
-#include "opencv2/highgui/highgui.hpp"
 #include "opencv2/imgproc/imgproc.hpp"
 #include "opencv2/calib3d/calib3d.hpp"
+
+//#include "opencv2/imgproc.hpp"
+//#include "opencv2/calib3d.hpp"
 
 #include "MarkersDetector.h"
 #include <numeric>
@@ -12,10 +13,8 @@
 using namespace cv;
 using namespace std;
 
-
 cv::Mat MarkersDetector::androidFrame;
-bool MarkersDetector::androidReady;
-
+AfterFrameUpdateCallback MarkersDetector::afterFrameUpdateCallback;
 
 float Marker::getPerimeter()
 {
@@ -77,18 +76,35 @@ MarkersDetector::MarkersDetector(std::map <int, std::array<float, 3>>* markersLo
 
 	m_isOpen = false;
 
-	MarkersDetector::androidReady = true;
 }
 
 std::vector<Marker> MarkersDetector::detectMarkers(Mat frame)
 {
+#ifdef __ANDROID__
+	ALOGI("before grey");
+#endif
 	Mat grey = convertToGrey(frame);
+#ifdef __ANDROID__
+	ALOGI("before threshold");
+#endif
 	Mat binaryImg = performThreshold(grey);
+#ifdef __ANDROID__
+	ALOGI("beforefind contours");
+#endif
 	std::vector<std::vector<cv::Point>> contours = findContours(binaryImg);
+#ifdef __ANDROID__
+	ALOGI("before find possible markers");
+#endif
 	std::vector<Marker> markers = findPossibleMarkers(contours);
+#ifdef __ANDROID__
+	ALOGI("before filters");
+#endif
 	markers = filterMarkersByPerimiter(markers);
 	markers = filterMarkersByHammingCode(grey, markers);
 	detectPreciseMarkerCorners(grey, markers);
+#ifdef __ANDROID__
+	ALOGI("before markers locations");
+#endif
 	detectMarkersLocation(grey, markers);
 
 	return markers;
@@ -97,7 +113,13 @@ std::vector<Marker> MarkersDetector::detectMarkers(Mat frame)
 Mat MarkersDetector::convertToGrey(Mat frame)
 {
 	Mat grey;
+#ifdef __ANDROID__
+	ALOGI("before cvt");
+#endif
 	cv::cvtColor(frame, grey, CV_BGRA2GRAY);
+#ifdef __ANDROID__
+	ALOGI("after cvt");
+#endif
 	return grey;
 }
 
@@ -476,7 +498,13 @@ void MarkersDetector::calculateCameraPose(std::vector<Marker> markers, map <int,
 
 void MarkersDetector::getCameraPoseByImage(Mat& frame, cv::Point3f& camLocation, cv::Point3f& camRotation, int& usedMarkers)
 {
+#ifdef __ANDROID__
+	ALOGI("before detect");
+#endif
 	std::vector<Marker> markers = detectMarkers(frame);
+#ifdef __ANDROID__
+	ALOGI("before draw");
+#endif
 	drawMarkers(frame, markers);
 	calculateCameraPose(markers, m_markersLocations, camLocation, camRotation, usedMarkers);
 
@@ -576,7 +604,6 @@ void MarkersDetector::update(std::vector<uchar>& buffer, std::array<float, 3>& c
 	camRotation[1] = cr.y;
 	camRotation[2] = cr.z;
 
-	MarkersDetector::androidReady = true;
 }
 
 void MarkersDetector::updateCameraPose(std::array<float, 3>& camLocation, std::array<float, 3>& camRotation, int& usedMarkers)
@@ -598,37 +625,83 @@ void MarkersDetector::updateCameraPose(std::array<float, 3>& camLocation, std::a
 	camRotation[0] = cr.x;
 	camRotation[1] = cr.y;
 	camRotation[2] = cr.z;
+}
 
-	MarkersDetector::androidReady = true;
+void MarkersDetector::updateCameraPoseWithCallback()
+{
+#ifdef __ANDROID__
+	ALOGI("update1");
+#endif
+
+	Mat frame = getFrame();
+	if (!frame.data) {
+		#ifdef __ANDROID__
+			ALOGW("Empty frame");
+		#endif
+		return;
+	}
+
+	cv::Point3f cl;
+	cv::Point3f cr;
+	int usedMarkers;
+
+#ifdef __ANDROID__
+	ALOGI("update2 with frame %dx%d", frame.cols, frame.rows);
+#endif
+
+	getCameraPoseByImage(frame, cl, cr, usedMarkers);
+
+#ifdef __ANDROID__
+	ALOGI("update3");
+#endif
+
+	std::array<float, 3> camLocation;
+	std::array<float, 3> camRotation;
+
+	camLocation[0] = cl.x;
+	camLocation[1] = cl.y;
+	camLocation[2] = cl.z;
+
+	camRotation[0] = cr.x;
+	camRotation[1] = cr.y;
+	camRotation[2] = cr.z;
+
+
+
+	if (afterPoseUpdateCallback) {
+#ifdef __ANDROID__
+		ALOGI("update call callback");
+#endif
+		afterPoseUpdateCallback(camLocation, camRotation, usedMarkers);
+	}
 }
 
 
 #ifdef __ANDROID__
 
-extern "C"
+
+
 jboolean
 Java_org_getid_markersdetector_AndroidCamera_FrameProcessing(
 JNIEnv* env, jobject thiz,
 jint width, jint height,
 jbyteArray NV21FrameData)
 {
-	jbyte * pNV21FrameData = env->GetByteArrayElements(NV21FrameData, 0);
+	jbyte* pNV21FrameData = env->GetByteArrayElements(NV21FrameData, NULL);
 
+    unsigned char* data[height * width * 4];
+	memcpy(pNV21FrameData, data, sizeof(pNV21FrameData));
 
-	MarkersDetector::androidFrame = Mat(height, width, CV_8UC4, (unsigned char *)pNV21FrameData);
-	MarkersDetector::androidReady = false;
+	MarkersDetector::androidFrame = cv::Mat(height, width, CV_8UC4, data);
+	if (MarkersDetector::afterFrameUpdateCallback) {
+		MarkersDetector::afterFrameUpdateCallback();
+	}
 
-	env->ReleaseByteArrayElements(NV21FrameData, pNV21FrameData, 0);
+	env->ReleaseByteArrayElements(NV21FrameData, pNV21FrameData, JNI_ABORT);
 	return true;
 }
 
 
-extern "C"
-jboolean
-Java_org_getid_markersdetector_AndroidCamera_IsReadyToGetFrame(JNIEnv* env, jobject thiz)
-{
-	return MarkersDetector::androidReady;
-}
 
 #endif
 

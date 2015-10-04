@@ -670,11 +670,18 @@ jbyteArray NV21FrameData)
 {
 	jbyte* pNV21FrameData = env->GetByteArrayElements(NV21FrameData, NULL);
  
-    int size = height * width * 3 / 2; //12 bits per pixel
-    unsigned char* data[size];
+    /*
+        int size = height * width * 3 / 2; //12 bits per pixel
+        unsigned char* data[size];
 	memcpy(data, pNV21FrameData, size);
+	*/
+	
+	cv::Mat yuv(height + height/2, width, CV_8UC1, (uchar*)pNV21FrameData);
+    cv::Mat rgba(height, width, CV_8UC4);
 
-	MarkersDetector::androidFrame = cv::Mat(height, width, CV_8UC4, data);
+    cv::cvtColor(yuv, rgba, CV_YUV2RGBA_NV21);
+
+	MarkersDetector::androidFrame = rgba;
 	if (MarkersDetector::afterFrameUpdateCallback) {
 		MarkersDetector::afterFrameUpdateCallback();
 	}

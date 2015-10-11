@@ -594,7 +594,7 @@ Mat MarkersDetector::getFrame()
 		stream->read(f);
 	}
 	else {
-		f = MarkersDetector::androidFrame;
+		f = MarkersDetector::androidFrame.clone();
 	}
 
 	return f;

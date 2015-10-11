@@ -38,6 +38,20 @@ int strToInt(string s)
 	return i;
 }
 
+int debugLastYPos = 80;
+
+void drawUsedTime(double t1, Mat frame, string id)
+{
+	double t2 = cv::getTickCount();
+	double fps = (t2 - t1)/getTickFrequency();
+	
+	debugLastYPos += 20;
+	
+	char strb[256];
+    sprintf(strb, "%.3f", fps);
+    cv::putText(frame, id + " " + std::string(strb), cv::Point(8,debugLastYPos), cv::FONT_HERSHEY_COMPLEX_SMALL, 1, cv::Scalar(0,255,0,255));
+}
+
 
 
 MarkersDetector::MarkersDetector(std::map <int, std::array<float, 3>>* markersLocations, std::array<double, 9> cameraMatrixBuf, std::array<double, 8> cameraDistortionBuf, int markerHalfSize)
@@ -63,7 +77,8 @@ MarkersDetector::MarkersDetector(std::map <int, std::array<float, 3>>* markersLo
 		m_cameraDistortion.at<double>(0, i) = cameraDistortionBuf[i];
 	}
 
-	m_markerSize = Size(700, 700);
+    m_markerCellSize = 10;
+	m_markerSize = Size(70, 70);
 	m_markerCorners2d.push_back(Point(m_markerSize.width, 0));
 	m_markerCorners2d.push_back(Point(m_markerSize.width, m_markerSize.height));
 	m_markerCorners2d.push_back(Point(0, m_markerSize.height));
@@ -81,17 +96,54 @@ MarkersDetector::MarkersDetector(std::map <int, std::array<float, 3>>* markersLo
 
 std::vector<Marker> MarkersDetector::detectMarkers(Mat frame)
 {
+
+    double t1;
+    t1 = cv::getTickCount();
+    
 	Mat grey = convertToGrey(frame);
+	
+	drawUsedTime(t1, frame, "convert to grey");
+	t1 = cv::getTickCount();
+	
 	Mat binaryImg = performThreshold(grey);
+	
+	drawUsedTime(t1, frame, "thres");
+	t1 = cv::getTickCount();
+	
 	std::vector<std::vector<cv::Point>> contours = findContours(binaryImg);
 #ifdef __ANDROID__
     ALOGI("found contours: %d", contours.size());
 #endif
+	
+	drawUsedTime(t1, frame, "find contours");
+	t1 = cv::getTickCount();
+
 	std::vector<Marker> markers = findPossibleMarkers(contours);
+	
+	drawUsedTime(t1, frame, "find possible markers");
+	t1 = cv::getTickCount();
+
+	
 	markers = filterMarkersByPerimiter(markers);
-	markers = filterMarkersByHammingCode(grey, markers);
+	
+	drawUsedTime(t1, frame, "filter by per");
+	t1 = cv::getTickCount();
+	
+	cv::putText(frame, "markers for hamm: " + intToStr(markers.size()), cv::Point(8,450), cv::FONT_HERSHEY_COMPLEX_SMALL, 1, cv::Scalar(0,0,255,255));
+	
+	markers = filterMarkersByHammingCode(frame, grey, markers);
+	
+	drawUsedTime(t1, frame, "filter by hamm");
+	t1 = cv::getTickCount();
+	
 	detectPreciseMarkerCorners(grey, markers);
+	
+	drawUsedTime(t1, frame, "precise");
+	t1 = cv::getTickCount();
+	
 	detectMarkersLocation(grey, markers);
+	
+	drawUsedTime(t1, frame, "detect locations");
 
 	return markers;
 }
@@ -306,28 +358,40 @@ int MarkersDetector::getHammingId(Mat bitMatrix)
 	return strToInt(idStr);
 }
 
-std::vector<Marker> MarkersDetector::filterMarkersByHammingCode(Mat imgGrey, std::vector<Marker> possibleMarkers)
+std::vector<Marker> MarkersDetector::filterMarkersByHammingCode(Mat frame, Mat imgGrey, std::vector<Marker> possibleMarkers)
 {
 	std::vector<Marker> goodMarkers;
-
+	
+	//drawUsedTime(t1, frame, 210, "filter by hamm");
+	double t1;
+	t1 = cv::getTickCount();
+	
 	for (size_t i = 0; i < possibleMarkers.size(); i++)
 	{
 		cv::Mat canonicalMarker;
 		Marker& marker = possibleMarkers[i];
 		// Find the perspective transfomation that brings current marker to rectangular form
 		cv::Mat M = cv::getPerspectiveTransform(marker.points, m_markerCorners2d);
+		
+		//drawUsedTime(t1, frame, "get perspect tr");
+		//t1 = cv::getTickCount();
+		
 		// Transform image to get a canonical marker image
 		cv::warpPerspective(imgGrey, canonicalMarker, M, m_markerSize);
+		
+		//drawUsedTime(t1, frame, "warp");
+		//t1 = cv::getTickCount();
 
 		cv::threshold(canonicalMarker, canonicalMarker, 125, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
 
 
-		int cellSize = 100;
-
-		cv::Rect r(cellSize, cellSize, m_markerSize.width - 2 * cellSize, m_markerSize.height - 2 * cellSize);
+		cv::Rect r(m_markerCellSize, m_markerCellSize, m_markerSize.width - 2 * m_markerCellSize, m_markerSize.height - 2 * m_markerCellSize);
 		cv::Mat subView = canonicalMarker(r);
 
 		//imshow("canonical markers", subView);
+		
+		//drawUsedTime(t1, frame, "prepare cells");
+		//t1 = cv::getTickCount();
 
 
 		cv::Mat bitMatrix = cv::Mat::zeros(5, 5, CV_8UC1);
@@ -336,14 +400,17 @@ std::vector<Marker> MarkersDetector::filterMarkersByHammingCode(Mat imgGrey, std
 		{
 			for (int x = 0; x<5; x++)
 			{
-				int cellX = (x)*cellSize;
-				int cellY = (y)*cellSize;
-				cv::Mat cell = subView(cv::Rect(cellX, cellY, cellSize, cellSize));
+				int cellX = (x)*m_markerCellSize;
+				int cellY = (y)*m_markerCellSize;
+				cv::Mat cell = subView(cv::Rect(cellX, cellY, m_markerCellSize, m_markerCellSize));
 				int nZ = cv::countNonZero(cell);
-				if (nZ>(cellSize*cellSize) / 2)
+				if (nZ>(m_markerCellSize*m_markerCellSize) / 2)
 					bitMatrix.at<uchar>(y, x) = 1;
 			}
 		}
+		
+		//drawUsedTime(t1, frame, "make bit matrix");
+		//t1 = cv::getTickCount();
 
 
 		//check all possible rotations
@@ -363,6 +430,10 @@ std::vector<Marker> MarkersDetector::filterMarkersByHammingCode(Mat imgGrey, std
 				minDist.second = i;
 			}
 		}
+		
+		
+		//drawUsedTime(t1, frame, "check rotations");
+		//t1 = cv::getTickCount();
 
 		//sort the points so that they are always in the same order
 		// no matter the camera orientation
@@ -371,6 +442,8 @@ std::vector<Marker> MarkersDetector::filterMarkersByHammingCode(Mat imgGrey, std
 
 		//get id
 		marker.id = getHammingId(rotations[minDist.second]);
+		
+		//drawUsedTime(t1, frame, "get id");
 
 		if (minDist.first == 0) {
 			goodMarkers.push_back(marker);
@@ -505,8 +578,13 @@ void MarkersDetector::getFirstMarkerPose(std::vector<uchar>& buffer, std::array<
 	if (!frame.data) {
 		return;
 	}
+	
+	debugLastYPos = 80;
+	double t1 = cv::getTickCount();
 
 	std::vector<Marker> markers = detectMarkers(frame);
+    
+    drawUsedTime(t1, frame, "detect markers");
 
 	drawMarkers(frame, markers);
 
@@ -720,6 +798,8 @@ void MarkersDetector::updateCameraPoseWithCallback()
 		afterPoseUpdateCallback(camLocation, camRotation, usedMarkers);
 	}
 }
+
+
 
 
 #ifdef __ANDROID__

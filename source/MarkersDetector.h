@@ -98,6 +98,7 @@ private:
 	bool m_isOpen = false;
 
 	Size m_markerSize;
+	int m_markerCellSize;
 	std::vector<Point2f> m_markerCorners2d;
 	std::vector<Point3f> m_markerCorners3d;
 
@@ -114,7 +115,7 @@ private:
 	Mat rotate90(Mat mat);
 	int getHammingId(Mat bitMatrix);
 
-	std::vector<Marker> filterMarkersByHammingCode(Mat imgGrey, std::vector<Marker> possibleMarkers);
+	std::vector<Marker> filterMarkersByHammingCode(Mat frame, Mat imgGrey, std::vector<Marker> possibleMarkers);
 
 	void detectPreciseMarkerCorners(Mat imgGrey, std::vector<Marker>& markers);
 

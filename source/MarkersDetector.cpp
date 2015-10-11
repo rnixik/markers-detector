@@ -15,6 +15,7 @@ using namespace std;
 
 cv::Mat MarkersDetector::androidFrame;
 AfterFrameUpdateCallback MarkersDetector::afterFrameUpdateCallback;
+BeforeFrameUpdateCallback MarkersDetector::beforeFrameUpdateCallback;
 
 float Marker::getPerimeter()
 {
@@ -498,6 +499,43 @@ void MarkersDetector::getCameraPoseByImage(Mat& frame, cv::Point3f& camLocation,
 #endif
 }
 
+void MarkersDetector::getFirstMarkerPose(std::vector<uchar>& buffer, std::array<float, 3>& translation, std::array<float, 3>& rotation, int& usedMarkers)
+{
+	Mat frame = getFrame();
+	if (!frame.data) {
+		return;
+	}
+
+	std::vector<Marker> markers = detectMarkers(frame);
+
+	drawMarkers(frame, markers);
+
+	if (markers.size()) {
+		Marker fm = markers.at(0);
+
+		cv::Point3f tv = cv::Point3f(fm.translationVector);
+		cv::Point3f rv = cv::Point3f(fm.rotationVector);
+
+		translation[0] = tv.x;
+		translation[1] = tv.y;
+		translation[2] = tv.z;
+
+		rotation[0] = rv.x;
+		rotation[1] = rv.y;
+		rotation[2] = rv.z;
+
+		usedMarkers = markers.size();
+
+		string s = "x=" + intToStr(tv.x) + ", y=" + intToStr(tv.y) + ", z=" + intToStr(tv.z) + "; found markers: " + intToStr(usedMarkers);
+		putText(frame, s, Point(20, 20), CV_FONT_HERSHEY_COMPLEX, 0.5, Scalar(0, 255, 255), 1, 2);
+
+		string s2 = "r1=" + intToStr(rv.x) + ", r2=" + intToStr(rv.y) + ", r3=" + intToStr(rv.z);
+		putText(frame, s2, Point(20, 50), CV_FONT_HERSHEY_COMPLEX, 0.5, Scalar(255, 0, 255), 1, 2);
+	}
+
+	(buffer).assign(frame.datastart, frame.dataend);
+}
+
 bool MarkersDetector::captureCamera(int cameraId, int width, int height)
 {
 	#ifdef __ANDROID__
@@ -587,6 +625,32 @@ void MarkersDetector::update(std::vector<uchar>& buffer, std::array<float, 3>& c
 
 }
 
+void MarkersDetector::update(unsigned char* buffer, std::array<float, 3>& camLocation, std::array<float, 3>& camRotation, int& usedMarkers)
+{
+
+	Mat frame = getFrame();
+	if (!frame.data) {
+		return;
+	}
+
+	cv::Point3f cl;
+	cv::Point3f cr;
+
+	getCameraPoseByImage(frame, cl, cr, usedMarkers);
+
+	buffer = (unsigned char*) frame.data;
+
+	camLocation[0] = cl.x;
+	camLocation[1] = cl.y;
+	camLocation[2] = cl.z;
+
+	camRotation[0] = cr.x;
+	camRotation[1] = cr.y;
+	camRotation[2] = cr.z;
+
+}
+
+
 void MarkersDetector::updateCameraPose(std::array<float, 3>& camLocation, std::array<float, 3>& camRotation, int& usedMarkers)
 {
 	Mat frame = getFrame();
@@ -661,27 +725,32 @@ void MarkersDetector::updateCameraPoseWithCallback()
 #ifdef __ANDROID__
 
 
-
+extern "C"
 jboolean
 Java_org_getid_markersdetector_AndroidCamera_FrameProcessing(
 JNIEnv* env, jobject thiz,
 jint width, jint height,
 jbyteArray NV21FrameData)
 {
+    if (MarkersDetector::beforeFrameUpdateCallback) {
+		MarkersDetector::beforeFrameUpdateCallback();
+	}
+	
 	jbyte* pNV21FrameData = env->GetByteArrayElements(NV21FrameData, NULL);
  
-    /*
-        int size = height * width * 3 / 2; //12 bits per pixel
-        unsigned char* data[size];
-	memcpy(data, pNV21FrameData, size);
-	*/
+    
+    //int size = height * width * 3 / 2; //12 bits per pixel
+    //unsigned char* data[size];
+	//memcpy(data, pNV21FrameData, size);
+	//MarkersDetector::androidFrame = cv::Mat(height, width, CV_8UC4, data);
+	
 	
 	cv::Mat yuv(height + height/2, width, CV_8UC1, (uchar*)pNV21FrameData);
     cv::Mat rgba(height, width, CV_8UC4);
-
     cv::cvtColor(yuv, rgba, CV_YUV2RGBA_NV21);
-
 	MarkersDetector::androidFrame = rgba;
+	
+		
 	if (MarkersDetector::afterFrameUpdateCallback) {
 		MarkersDetector::afterFrameUpdateCallback();
 	}

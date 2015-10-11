@@ -48,6 +48,7 @@ private:
 };
 
 typedef void(*AfterFrameUpdateCallback)();
+typedef void(*BeforeFrameUpdateCallback)();
 typedef void(*AfterPoseUpdateCallback)(std::array<float, 3> camLocation, std::array<float, 3> camRotation, int usedMarkers);
 
 class MARKERSDETECTOR_API MarkersDetector{
@@ -70,14 +71,21 @@ public:
 
 	void update(std::vector<uchar>& buffer, std::array<float, 3>& camLocation, std::array<float, 3>& camRotation, int& usedMarkers);
 
+	void update(unsigned char* buffer, std::array<float, 3>& camLocation, std::array<float, 3>& camRotation, int& usedMarkers);
+
 	void updateCameraPose(std::array<float, 3>& camLocation, std::array<float, 3>& camRotation, int& usedMarkers);
+
+	void getFirstMarkerPose(std::vector<uchar>& buffer, std::array<float, 3>& translation, std::array<float, 3>& rotation, int& usedMarkers);
 	
 	static cv::Mat androidFrame;
 
 	static AfterFrameUpdateCallback afterFrameUpdateCallback;
+	static BeforeFrameUpdateCallback beforeFrameUpdateCallback;
 
 	void updateCameraPoseWithCallback();
 	AfterPoseUpdateCallback afterPoseUpdateCallback;
+	
+	Mat getFrame();
 
 private:
 
@@ -112,7 +120,6 @@ private:
 
 	void detectMarkersLocation(Mat imgGrey, std::vector<Marker>& markers);
 
-	Mat getFrame();
 
 };
 

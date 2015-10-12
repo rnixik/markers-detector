@@ -22,6 +22,7 @@ public class AndroidCamera implements Camera.PreviewCallback{
     private byte[] FrameData = null;
     private int PreviewSizeWidth = 640;
     private int PreviewSizeHeight = 480;
+    private Camera.Size actualSize;
     private boolean bProcessing = false;
 
     Handler mHandler = new Handler(Looper.getMainLooper());
@@ -63,8 +64,7 @@ public class AndroidCamera implements Camera.PreviewCallback{
         imageFormat = parameters.getPreviewFormat();
         mCamera.setParameters(parameters);
 
-        Camera.Size size = parameters.getPreviewSize();
-        //bufferSize = size.width * size.height * ImageFormat.getBitsPerPixel(imageFormat) / 8;
+        actualSize = parameters.getPreviewSize();
 
         /* Workaround for API > 10. It needs some preview destination */
         if (Build.VERSION.SDK_INT > 10) {
@@ -118,7 +118,7 @@ public class AndroidCamera implements Camera.PreviewCallback{
             public void run()
             {
                 bProcessing = true;
-                FrameProcessing(PreviewSizeWidth, PreviewSizeHeight, FrameData);
+                FrameProcessing(actualSize.width, actualSize.height, FrameData);
                 bProcessing = false;
             }
         };

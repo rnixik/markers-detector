@@ -9,6 +9,7 @@
 #include <map>
 #include <array>
 #include <iostream>
+#include <mutex>
 
 using namespace cv;
 using namespace std;
@@ -16,6 +17,8 @@ using namespace std;
 cv::Mat MarkersDetector::androidFrame;
 AfterFrameUpdateCallback MarkersDetector::afterFrameUpdateCallback;
 BeforeFrameUpdateCallback MarkersDetector::beforeFrameUpdateCallback;
+
+std::mutex frame_mutex;
 
 float Marker::getPerimeter()
 {
@@ -672,7 +675,9 @@ Mat MarkersDetector::getFrame()
 		stream->read(f);
 	}
 	else {
+	    frame_mutex.lock();
 		f = MarkersDetector::androidFrame.clone();
+		frame_mutex.unlock();
 	}
 
 	return f;
@@ -828,7 +833,10 @@ jbyteArray NV21FrameData)
 	cv::Mat yuv(height + height/2, width, CV_8UC1, (uchar*)pNV21FrameData);
     cv::Mat rgba(height, width, CV_8UC4);
     cv::cvtColor(yuv, rgba, CV_YUV2RGBA_NV21);
+    
+    frame_mutex.lock();
 	MarkersDetector::androidFrame = rgba;
+	frame_mutex.unlock();
 	
 		
 	if (MarkersDetector::afterFrameUpdateCallback) {

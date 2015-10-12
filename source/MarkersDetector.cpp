@@ -4,6 +4,8 @@
 //#include "opencv2/imgproc.hpp"
 //#include "opencv2/calib3d.hpp"
 
+//#define DEBGUB_DRAW
+
 #include "MarkersDetector.h"
 #include <numeric>
 #include <map>
@@ -45,6 +47,10 @@ int debugLastYPos = 80;
 
 void drawUsedTime(double t1, Mat frame, string id)
 {
+    #ifndef DEBGUB_DRAW
+        return;
+    #endif
+    
 	double t2 = cv::getTickCount();
 	double fps = (t2 - t1)/getTickFrequency();
 	
@@ -57,14 +63,9 @@ void drawUsedTime(double t1, Mat frame, string id)
 
 
 
-MarkersDetector::MarkersDetector(std::map <int, std::array<float, 3>>* markersLocations, std::array<double, 9> cameraMatrixBuf, std::array<double, 8> cameraDistortionBuf, int markerHalfSize)
+MarkersDetector::MarkersDetector(std::array<double, 9> cameraMatrixBuf, std::array<double, 8> cameraDistortionBuf, int printedMarkerWidth)
 {
-	//std::map <int, std::array<float, 3>> ml = *markersLocations;
-	typedef std::map <int, std::array<float, 3>>::iterator it_type;
-	for (it_type iterator = markersLocations->begin(); iterator != markersLocations->end(); iterator++) {
-		cv::Point3f p = { iterator->second[0], iterator->second[1], iterator->second[2] };
-		m_markersLocations[iterator->first] = p;
-	}
+	
 
 
 	m_cameraMatrix = Mat(3, 3, CV_64F);
@@ -86,15 +87,24 @@ MarkersDetector::MarkersDetector(std::map <int, std::array<float, 3>>* markersLo
 	m_markerCorners2d.push_back(Point(m_markerSize.width, m_markerSize.height));
 	m_markerCorners2d.push_back(Point(0, m_markerSize.height));
 	m_markerCorners2d.push_back(Point(0, 0));
-
-	float halfSize = markerHalfSize;
+	
+	float halfSize = printedMarkerWidth / 2.0;
 	m_markerCorners3d.push_back(Point3f(-halfSize, halfSize, 0));
 	m_markerCorners3d.push_back(Point3f(-halfSize, -halfSize, 0));
 	m_markerCorners3d.push_back(Point3f(halfSize, -halfSize, 0));
 	m_markerCorners3d.push_back(Point3f(halfSize, halfSize, 0));
 
 	m_isOpen = false;
+}
 
+bool MarkersDetector::setMarkersParams(map <int, std::array<float, 3>>* markersLocations)
+{
+    //std::map <int, std::array<float, 3>> ml = *markersLocations;
+	typedef std::map <int, std::array<float, 3>>::iterator it_type;
+	for (it_type iterator = markersLocations->begin(); iterator != markersLocations->end(); iterator++) {
+		cv::Point3f p = { iterator->second[0], iterator->second[1], iterator->second[2] };
+		m_markersLocations[iterator->first] = p;
+	}
 }
 
 std::vector<Marker> MarkersDetector::detectMarkers(Mat frame)
@@ -114,9 +124,10 @@ std::vector<Marker> MarkersDetector::detectMarkers(Mat frame)
 	t1 = cv::getTickCount();
 	
 	std::vector<std::vector<cv::Point>> contours = findContours(binaryImg);
-#ifdef __ANDROID__
-    ALOGI("found contours: %d", contours.size());
-#endif
+	
+    #ifdef __ANDROID__
+        ALOGI("found contours: %d", contours.size());
+    #endif
 	
 	drawUsedTime(t1, frame, "find contours");
 	t1 = cv::getTickCount();
@@ -132,9 +143,7 @@ std::vector<Marker> MarkersDetector::detectMarkers(Mat frame)
 	drawUsedTime(t1, frame, "filter by per");
 	t1 = cv::getTickCount();
 	
-	cv::putText(frame, "markers for hamm: " + intToStr(markers.size()), cv::Point(8,450), cv::FONT_HERSHEY_COMPLEX_SMALL, 1, cv::Scalar(0,0,255,255));
-	
-	markers = filterMarkersByHammingCode(frame, grey, markers);
+	markers = filterMarkersByHammingCode(grey, markers);
 	
 	drawUsedTime(t1, frame, "filter by hamm");
 	t1 = cv::getTickCount();
@@ -361,13 +370,10 @@ int MarkersDetector::getHammingId(Mat bitMatrix)
 	return strToInt(idStr);
 }
 
-std::vector<Marker> MarkersDetector::filterMarkersByHammingCode(Mat frame, Mat imgGrey, std::vector<Marker> possibleMarkers)
+std::vector<Marker> MarkersDetector::filterMarkersByHammingCode(Mat imgGrey, std::vector<Marker> possibleMarkers)
 {
 	std::vector<Marker> goodMarkers;
 	
-	//drawUsedTime(t1, frame, 210, "filter by hamm");
-	double t1;
-	t1 = cv::getTickCount();
 	
 	for (size_t i = 0; i < possibleMarkers.size(); i++)
 	{
@@ -376,25 +382,14 @@ std::vector<Marker> MarkersDetector::filterMarkersByHammingCode(Mat frame, Mat i
 		// Find the perspective transfomation that brings current marker to rectangular form
 		cv::Mat M = cv::getPerspectiveTransform(marker.points, m_markerCorners2d);
 		
-		//drawUsedTime(t1, frame, "get perspect tr");
-		//t1 = cv::getTickCount();
-		
+
 		// Transform image to get a canonical marker image
 		cv::warpPerspective(imgGrey, canonicalMarker, M, m_markerSize);
-		
-		//drawUsedTime(t1, frame, "warp");
-		//t1 = cv::getTickCount();
 
 		cv::threshold(canonicalMarker, canonicalMarker, 125, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
 
-
 		cv::Rect r(m_markerCellSize, m_markerCellSize, m_markerSize.width - 2 * m_markerCellSize, m_markerSize.height - 2 * m_markerCellSize);
 		cv::Mat subView = canonicalMarker(r);
-
-		//imshow("canonical markers", subView);
-		
-		//drawUsedTime(t1, frame, "prepare cells");
-		//t1 = cv::getTickCount();
 
 
 		cv::Mat bitMatrix = cv::Mat::zeros(5, 5, CV_8UC1);
@@ -411,9 +406,6 @@ std::vector<Marker> MarkersDetector::filterMarkersByHammingCode(Mat frame, Mat i
 					bitMatrix.at<uchar>(y, x) = 1;
 			}
 		}
-		
-		//drawUsedTime(t1, frame, "make bit matrix");
-		//t1 = cv::getTickCount();
 
 
 		//check all possible rotations
@@ -433,10 +425,6 @@ std::vector<Marker> MarkersDetector::filterMarkersByHammingCode(Mat frame, Mat i
 				minDist.second = i;
 			}
 		}
-		
-		
-		//drawUsedTime(t1, frame, "check rotations");
-		//t1 = cv::getTickCount();
 
 		//sort the points so that they are always in the same order
 		// no matter the camera orientation
@@ -445,8 +433,6 @@ std::vector<Marker> MarkersDetector::filterMarkersByHammingCode(Mat frame, Mat i
 
 		//get id
 		marker.id = getHammingId(rotations[minDist.second]);
-		
-		//drawUsedTime(t1, frame, "get id");
 
 		if (minDist.first == 0) {
 			goodMarkers.push_back(marker);
@@ -554,9 +540,6 @@ void MarkersDetector::calculateCameraPose(std::vector<Marker> markers, map <int,
 
 void MarkersDetector::getCameraPoseByImage(Mat& frame, cv::Point3f& camLocation, cv::Point3f& camRotation, int& usedMarkers)
 {
-#ifdef __ANDROID__
-	ALOGI("start getCameraPoseByImage");
-#endif
 	std::vector<Marker> markers = detectMarkers(frame);
 
 	drawMarkers(frame, markers);
@@ -569,25 +552,27 @@ void MarkersDetector::getCameraPoseByImage(Mat& frame, cv::Point3f& camLocation,
 		string s2 = "r1=" + intToStr(camRotation.x) + ", r2=" + intToStr(camRotation.y) + ", r3=" + intToStr(camRotation.z);
 		putText(frame, s2, Point(20, 50), CV_FONT_HERSHEY_COMPLEX, 0.5, Scalar(255, 0, 255), 1, 2);
 	}
-	
-#ifdef __ANDROID__
-	ALOGI("end getCameraPoseByImage");
-#endif
 }
 
-void MarkersDetector::getFirstMarkerPose(std::vector<uchar>& buffer, std::array<float, 3>& translation, std::array<float, 3>& rotation, int& usedMarkers)
+bool MarkersDetector::getFirstMarkerPose(FrameData& frameData, std::array<float, 3>& translation, std::array<float, 3>& rotation)
 {
+
+    debugLastYPos = 80;
+	double t1 = cv::getTickCount();
+	
+	double firstT = cv::getTickCount();
+	
 	Mat frame = getFrame();
 	if (!frame.data) {
-		return;
+		return false;
 	}
 	
-	debugLastYPos = 80;
-	double t1 = cv::getTickCount();
+	drawUsedTime(t1, frame, "get frame");
+	t1 = cv::getTickCount();
 
 	std::vector<Marker> markers = detectMarkers(frame);
     
-    drawUsedTime(t1, frame, "detect markers");
+    drawUsedTime(t1, frame, "total detect markers");
 
 	drawMarkers(frame, markers);
 
@@ -605,16 +590,20 @@ void MarkersDetector::getFirstMarkerPose(std::vector<uchar>& buffer, std::array<
 		rotation[1] = rv.y;
 		rotation[2] = rv.z;
 
-		usedMarkers = markers.size();
-
-		string s = "x=" + intToStr(tv.x) + ", y=" + intToStr(tv.y) + ", z=" + intToStr(tv.z) + "; found markers: " + intToStr(usedMarkers);
+		string s = "DIST=" + intToStr(cv::norm(tv)) + "; x=" + intToStr(tv.x) + ", y=" + intToStr(tv.y) + ", z=" + intToStr(tv.z);
 		putText(frame, s, Point(20, 20), CV_FONT_HERSHEY_COMPLEX, 0.5, Scalar(0, 255, 255), 1, 2);
 
 		string s2 = "r1=" + intToStr(rv.x) + ", r2=" + intToStr(rv.y) + ", r3=" + intToStr(rv.z);
 		putText(frame, s2, Point(20, 50), CV_FONT_HERSHEY_COMPLEX, 0.5, Scalar(255, 0, 255), 1, 2);
 	}
+	
+	drawUsedTime(firstT, frame, "total update marker pose");
 
-	(buffer).assign(frame.datastart, frame.dataend);
+	(frameData.buffer).assign(frame.datastart, frame.dataend);
+	frameData.width = frame.cols;
+	frameData.height = frame.rows;
+	
+	return true;
 }
 
 bool MarkersDetector::captureCamera(int cameraId, int width, int height)
@@ -664,21 +653,17 @@ Mat MarkersDetector::getFrame()
 {
 
 	Mat f;
-
-
-	if (!m_isOpen && !MarkersDetector::androidFrame.data) {
-		return f;
-	}
-
-
-	if (m_isOpen) {
-		stream->read(f);
-	}
-	else {
-	    frame_mutex.lock();
+	
+	
+	#ifndef __ANDROID__
+	    if (m_isOpen) {
+		    stream->read(f);
+	    }
+    #else
+        frame_mutex.lock();
 		f = MarkersDetector::androidFrame.clone();
 		frame_mutex.unlock();
-	}
+	#endif
 
 	return f;
 }
@@ -773,15 +758,7 @@ void MarkersDetector::updateCameraPoseWithCallback()
 	cv::Point3f cr;
 	int usedMarkers;
 
-#ifdef __ANDROID__
-	ALOGI("update2 with frame %dx%d", frame.cols, frame.rows);
-#endif
-
 	getCameraPoseByImage(frame, cl, cr, usedMarkers);
-
-#ifdef __ANDROID__
-	ALOGI("update3");
-#endif
 
 	std::array<float, 3> camLocation;
 	std::array<float, 3> camRotation;

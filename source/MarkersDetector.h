@@ -47,6 +47,13 @@ private:
 
 };
 
+struct FrameData
+{
+    std::vector<uchar> buffer;
+    int width;
+    int height;
+};
+
 typedef void(*AfterFrameUpdateCallback)();
 typedef void(*BeforeFrameUpdateCallback)();
 typedef void(*AfterPoseUpdateCallback)(std::array<float, 3> camLocation, std::array<float, 3> camRotation, int usedMarkers);
@@ -54,7 +61,9 @@ typedef void(*AfterPoseUpdateCallback)(std::array<float, 3> camLocation, std::ar
 class MARKERSDETECTOR_API MarkersDetector{
 
 public:
-	MarkersDetector(map <int, std::array<float, 3>>* markersLocations, std::array<double, 9> cameraMatrixBuf, std::array<double, 8> cameraDistortionBuf, int markerHalfSize);
+	MarkersDetector(std::array<double, 9> cameraMatrixBuf, std::array<double, 8> cameraDistortionBuf, int printedMarkerWidth);
+
+    bool setMarkersParams(map <int, std::array<float, 3>>* markersLocations);
 
 	int threshold = 0;
 
@@ -75,7 +84,7 @@ public:
 
 	void updateCameraPose(std::array<float, 3>& camLocation, std::array<float, 3>& camRotation, int& usedMarkers);
 
-	void getFirstMarkerPose(std::vector<uchar>& buffer, std::array<float, 3>& translation, std::array<float, 3>& rotation, int& usedMarkers);
+	bool getFirstMarkerPose(FrameData& frameData, std::array<float, 3>& translation, std::array<float, 3>& rotation);
 	
 	static cv::Mat androidFrame;
 
@@ -115,7 +124,7 @@ private:
 	Mat rotate90(Mat mat);
 	int getHammingId(Mat bitMatrix);
 
-	std::vector<Marker> filterMarkersByHammingCode(Mat frame, Mat imgGrey, std::vector<Marker> possibleMarkers);
+	std::vector<Marker> filterMarkersByHammingCode(Mat imgGrey, std::vector<Marker> possibleMarkers);
 
 	void detectPreciseMarkerCorners(Mat imgGrey, std::vector<Marker>& markers);
 

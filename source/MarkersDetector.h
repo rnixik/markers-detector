@@ -63,7 +63,7 @@ class MARKERSDETECTOR_API MarkersDetector{
 public:
 	MarkersDetector(std::array<double, 9> cameraMatrixBuf, std::array<double, 8> cameraDistortionBuf, int printedMarkerWidth);
 
-    bool setMarkersParams(map <int, std::array<float, 3>>* markersLocations);
+    void setMarkersParams(map <int, std::array<float, 3>>* markersLocations);
 
 	int threshold = 0;
 
@@ -84,7 +84,7 @@ public:
 
 	void updateCameraPose(std::array<float, 3>& camLocation, std::array<float, 3>& camRotation, int& usedMarkers);
 
-	bool getFirstMarkerPose(FrameData& frameData, std::array<float, 3>& translation, std::array<float, 3>& rotation);
+	bool getFirstMarkerPose(FrameData& frameData, std::array<float, 3>& translation, std::array<float, 3>& rotation, bool& markerFound);
 	
 	static cv::Mat androidFrame;
 

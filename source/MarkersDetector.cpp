@@ -97,7 +97,7 @@ MarkersDetector::MarkersDetector(std::array<double, 9> cameraMatrixBuf, std::arr
 	m_isOpen = false;
 }
 
-bool MarkersDetector::setMarkersParams(map <int, std::array<float, 3>>* markersLocations)
+void MarkersDetector::setMarkersParams(map <int, std::array<float, 3>>* markersLocations)
 {
     //std::map <int, std::array<float, 3>> ml = *markersLocations;
 	typedef std::map <int, std::array<float, 3>>::iterator it_type;
@@ -554,8 +554,10 @@ void MarkersDetector::getCameraPoseByImage(Mat& frame, cv::Point3f& camLocation,
 	}
 }
 
-bool MarkersDetector::getFirstMarkerPose(FrameData& frameData, std::array<float, 3>& translation, std::array<float, 3>& rotation)
+bool MarkersDetector::getFirstMarkerPose(FrameData& frameData, std::array<float, 3>& translation, std::array<float, 3>& rotation, bool& markerFound)
 {
+
+    markerFound = false;
 
     debugLastYPos = 80;
 	double t1 = cv::getTickCount();
@@ -577,6 +579,7 @@ bool MarkersDetector::getFirstMarkerPose(FrameData& frameData, std::array<float,
 	drawMarkers(frame, markers);
 
 	if (markers.size()) {
+	    markerFound = true;
 		Marker fm = markers.at(0);
 
 		cv::Point3f tv = cv::Point3f(fm.translationVector);

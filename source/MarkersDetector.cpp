@@ -554,10 +554,10 @@ void MarkersDetector::getCameraPoseByImage(Mat& frame, cv::Point3f& camLocation,
 	}
 }
 
-bool MarkersDetector::getFirstMarkerPose(FrameData& frameData, std::array<float, 3>& translation, std::array<float, 3>& rotation, bool& markerFound)
+bool MarkersDetector::getFirstMarkerPose(FrameData& frameData, std::array<float, 3>& translation, std::array<float, 3>& rotation, int& markersFound)
 {
 
-    markerFound = false;
+    markersFound = 0;
 
     debugLastYPos = 80;
 	double t1 = cv::getTickCount();
@@ -579,7 +579,7 @@ bool MarkersDetector::getFirstMarkerPose(FrameData& frameData, std::array<float,
 	drawMarkers(frame, markers);
 
 	if (markers.size()) {
-	    markerFound = true;
+	    markersFound = markers.size();
 		Marker fm = markers.at(0);
 
 		cv::Point3f tv = cv::Point3f(fm.translationVector);
@@ -811,11 +811,11 @@ jbyteArray NV21FrameData)
 	
 	
 	cv::Mat yuv(height + height/2, width, CV_8UC1, (uchar*)pNV21FrameData);
-    cv::Mat rgba(height, width, CV_8UC4);
-    cv::cvtColor(yuv, rgba, CV_YUV2RGBA_NV21);
+    cv::Mat bgr(height, width, CV_8UC4);
+    cv::cvtColor(yuv, bgr, CV_YUV2BGR_NV21);
     
     frame_mutex.lock();
-	MarkersDetector::androidFrame = rgba;
+	MarkersDetector::androidFrame = bgr;
 	frame_mutex.unlock();
 	
 		

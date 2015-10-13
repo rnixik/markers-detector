@@ -84,7 +84,7 @@ public:
 
 	void updateCameraPose(std::array<float, 3>& camLocation, std::array<float, 3>& camRotation, int& usedMarkers);
 
-	bool getFirstMarkerPose(FrameData& frameData, std::array<float, 3>& translation, std::array<float, 3>& rotation, bool& markerFound);
+	bool getFirstMarkerPose(FrameData& frameData, std::array<float, 3>& translation, std::array<float, 3>& rotation, int& markersFound);
 	
 	static cv::Mat androidFrame;
 

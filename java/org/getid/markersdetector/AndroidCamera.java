@@ -42,6 +42,7 @@ public class AndroidCamera implements Camera.PreviewCallback{
 
     public AndroidCamera(Context context) {
         //super(context);
+        InitJNI();
     }
 
     public void startPreview() {
@@ -65,6 +66,7 @@ public class AndroidCamera implements Camera.PreviewCallback{
         mCamera.setParameters(parameters);
 
         actualSize = parameters.getPreviewSize();
+        Log.i(TAG, "Actual preview size: " + actualSize.width + "x" + actualSize.height);
 
         /* Workaround for API > 10. It needs some preview destination */
         if (Build.VERSION.SDK_INT > 10) {
@@ -123,7 +125,15 @@ public class AndroidCamera implements Camera.PreviewCallback{
             }
         };
 
+    public void SetPreviewSize(int width, int height) {
+        Log.i(TAG, "SET PREVIEW SIZE: " + width + " x " + height);
+        PreviewSizeWidth = width;
+        PreviewSizeHeight = height;
+        stopPreview();
+        startPreview();
+    }
 
+    public native boolean InitJNI();
     public native boolean FrameProcessing(int width, int height, byte[] NV21FrameData);
 
 }

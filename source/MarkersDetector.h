@@ -135,6 +135,11 @@ private:
 
 
 #ifdef __ANDROID__
+
+extern "C" {
+JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *jvm, void *reserved);
+};
+
 extern "C"
 jboolean
 Java_org_getid_markersdetector_AndroidCamera_FrameProcessing(
@@ -143,6 +148,7 @@ Java_org_getid_markersdetector_AndroidCamera_FrameProcessing(
         jbyteArray NV21FrameData);
 
 extern "C"
-jboolean
-Java_org_getid_markersdetector_AndroidCamera_IsReadyToGetFrame(JNIEnv* env, jobject thiz);
+void
+Java_org_getid_markersdetector_AndroidCamera_InitJNI(JNIEnv* env, jobject thiz);
+
 #endif        

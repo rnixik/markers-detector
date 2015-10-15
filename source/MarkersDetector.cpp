@@ -22,6 +22,66 @@ BeforeFrameUpdateCallback MarkersDetector::beforeFrameUpdateCallback;
 
 std::mutex frame_mutex;
 
+
+
+
+
+#ifdef __ANDROID__
+
+JavaVM *gJavaVm = NULL;
+
+jclass AndroidCameraClass;
+jmethodID midSetPreviewSize;
+jobject AndroidCameraObject;
+
+
+JNIEnv* getEnv() {
+    JNIEnv *env;
+    
+    int status = gJavaVm->GetEnv((void **) &env, JNI_VERSION_1_6);
+    if (status == JNI_EDETACHED)
+    {
+        status = gJavaVm->AttachCurrentThread(&env, NULL);
+        if (status != JNI_OK) {
+            ALOGW("AttachCurrentThread failed %d", status);
+            return nullptr;
+         }
+    }
+    return env;
+}
+
+JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *javaVm, void *reserved) {
+    gJavaVm = javaVm;
+    
+    JNIEnv *env = getEnv();
+    AndroidCameraClass = env->FindClass("org/getid/markersdetector/AndroidCamera");
+    midSetPreviewSize = env->GetMethodID(AndroidCameraClass, "SetPreviewSize", "(II)V");
+    
+    return JNI_VERSION_1_6;
+}
+
+
+
+void setPreviewSize(int width, int height) {
+    JNIEnv *env = getEnv();
+ 
+    if (!AndroidCameraObject) {
+      ALOGW("AndroidCameraObject is null. Check InitJNI call");
+      return;
+    }
+    
+    if (!midSetPreviewSize) {
+      ALOGW("MethodId for SetPreviewSize is null");
+      return;
+    }
+    
+    env->CallVoidMethod(AndroidCameraObject, midSetPreviewSize, width, height);
+}
+#endif
+
+
+
+
 float Marker::getPerimeter()
 {
 	float p = arcLength(points, true);
@@ -612,6 +672,7 @@ bool MarkersDetector::getFirstMarkerPose(FrameData& frameData, std::array<float,
 bool MarkersDetector::captureCamera(int cameraId, int width, int height)
 {
 	#ifdef __ANDROID__
+	    setPreviewSize(width, height);
 		return true;
 	#endif
 
@@ -789,6 +850,12 @@ void MarkersDetector::updateCameraPoseWithCallback()
 
 #ifdef __ANDROID__
 
+extern "C"
+void
+Java_org_getid_markersdetector_AndroidCamera_InitJNI(JNIEnv* env, jobject thiz)
+{
+    AndroidCameraObject = thiz;
+}
 
 extern "C"
 jboolean
@@ -800,6 +867,7 @@ jbyteArray NV21FrameData)
     if (MarkersDetector::beforeFrameUpdateCallback) {
 		MarkersDetector::beforeFrameUpdateCallback();
 	}
+	
 	
 	jbyte* pNV21FrameData = env->GetByteArrayElements(NV21FrameData, NULL);
  
@@ -824,6 +892,8 @@ jbyteArray NV21FrameData)
 	}
 
 	env->ReleaseByteArrayElements(NV21FrameData, pNV21FrameData, JNI_ABORT);
+	
+	
 	return true;
 }
 
